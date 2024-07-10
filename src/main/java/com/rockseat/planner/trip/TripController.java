@@ -1,13 +1,13 @@
 package com.rockseat.planner.trip;
 
 
-import com.rockseat.planner.trip.partipant.ParticipantService;
-import lombok.Getter;
+import com.rockseat.planner.partipant.ParticipantService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,7 +26,7 @@ public class TripController {
 
         this.repository.save(newTrip);
 
-        this.participantService.registerParticipantsToEvent(payload.emails_to_envite(), newTrip.getId());
+        this.participantService.registerParticipantsToEvent(payload.emails_to_envite(), newTrip);
 
         return ResponseEntity.ok(new TripCreateResponse(newTrip.getId()));
     }
@@ -36,5 +36,39 @@ public class TripController {
         Optional<Trip> trip = repository.findById(id);
         return trip.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
 
+    }
+    @PutMapping("/{id}")
+    public ResponseEntity<Trip> putTripDetails(@PathVariable UUID id, @RequestBody TripRequestPayload payload){
+
+        Optional<Trip> trip = repository.findById(id);
+
+        if (trip.isPresent()){
+            Trip rawTrip = trip.get();
+            rawTrip.setEndsAt(LocalDateTime.parse(payload.ends_at(), DateTimeFormatter.ISO_DATE_TIME));
+            rawTrip.setStartsAt(LocalDateTime.parse(payload.starts_at(), DateTimeFormatter.ISO_DATE_TIME));
+            rawTrip.setDestination(payload.destination());
+            this.repository.save(rawTrip);
+            return ResponseEntity.ok(rawTrip);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @GetMapping("/{id}/confirm")
+    public ResponseEntity<Trip> confirmTrip(@PathVariable UUID id){
+
+        Optional<Trip> trip = repository.findById(id);
+
+        if (trip.isPresent()){
+            Trip rawTrip = trip.get();
+
+            rawTrip.setIsConfirmed(true);
+
+            this.participantService.trigerConfirmationEmailToParticipants(id);
+
+            this.repository.save(rawTrip);
+
+            return ResponseEntity.ok(rawTrip);
+        }
+        return ResponseEntity.notFound().build();
     }
 }
